@@ -1,6 +1,6 @@
 import { Context, Schema, Session } from 'koishi'
 
-export const name = 'chatluna-exractor'
+export const name = 'chatluna-extractor'
 
 export const inject = ['chatluna_character']
 
@@ -41,7 +41,7 @@ declare module 'koishi' {
 }
 
 export function apply(ctx: Context, config: Config) {
-    const logger = ctx.logger('chatluna-exractor')
+    const logger = ctx.logger('chatluna-extractor')
 
     // 存储最新提取的内容，按群组 ID 分组，每个标签只保留最新值
     const extractedContents = new Map<string, Map<string, string | null>>()
@@ -112,7 +112,7 @@ export function apply(ctx: Context, config: Config) {
             characterLogger.debug = originalDebug
         })
 
-        logger.info('chatluna-exractor 插件已启动')
+        logger.info('chatluna-extractor 插件已启动')
     } else {
         logger.warn('无法拦截 chatluna_character.logger，logger 不存在或 debug 方法不可用')
     }

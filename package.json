@@ -1,7 +1,7 @@
 {
-  "name": "koishi-plugin-chatluna-exractor",
+  "name": "koishi-plugin-chatluna-extractor",
   "description": "提取 chatluna-character 输出中特定 XML 标签的内容",
-  "version": "0.0.4",
+  "version": "0.0.1",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -9,10 +9,10 @@
     "dist"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/K4F7/koishi-plugin-chatluna-exractor",
+  "homepage": "https://github.com/K4F7/koishi-plugin-chatluna-extractor",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/K4F7/koishi-plugin-chatluna-exractor.git"
+    "url": "git+https://github.com/K4F7/koishi-plugin-chatluna-extractor.git"
   },
   "keywords": [
     "chatbot",

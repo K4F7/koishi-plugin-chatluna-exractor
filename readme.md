@@ -1,6 +1,6 @@
-# koishi-plugin-chatluna-exractor
+# koishi-plugin-chatluna-extractor
 
-[![npm](https://img.shields.io/npm/v/koishi-plugin-chatluna-exractor?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-chatluna-exractor)
+[![npm](https://img.shields.io/npm/v/koishi-plugin-chatluna-extractor?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-chatluna-extractor)
 
 提取 chatluna-character 输出中特定 XML 标签的内容。
 
