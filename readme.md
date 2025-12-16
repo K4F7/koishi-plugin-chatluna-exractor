@@ -53,11 +53,6 @@ yarn add koishi-plugin-chatluna-exractor
 
 用户只会看到"今天天气不错呢！"，但可以通过发送 `think` 指令查看 AI 的思考过程。
 
-## 注意事项
-
-- 每个群组只保留最新一条回复的提取内容
-- 插件通过拦截 chatluna-character 的日志输出来获取原始模型响应，因此需要确保 chatluna-character 的日志级别包含 debug
-
 ## 许可证
 
 MIT

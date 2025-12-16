@@ -112,7 +112,7 @@ export function apply(ctx: Context, config: Config) {
             characterLogger.debug = originalDebug
         })
 
-        logger.info('成功拦截 chatluna_character.logger.debug')
+        logger.info('chatluna-exractor 插件已启动')
     } else {
         logger.warn('无法拦截 chatluna_character.logger，logger 不存在或 debug 方法不可用')
     }
