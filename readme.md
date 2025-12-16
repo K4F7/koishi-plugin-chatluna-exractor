@@ -10,13 +10,12 @@
 
 本插件可以拦截并提取这些标签内容，让用户可以通过指令查看 AI 的"内心想法"。
 
-## 安装
+### 主要用途
 
-```bash
-npm install koishi-plugin-chatluna-exractor
-# 或
-yarn add koishi-plugin-chatluna-exractor
-```
+- **查看思考过程** - 通过 `think` 指令查看 AI 在 `<think>` 标签中的思考内容，了解 AI 是如何理解和回应你的消息的
+- **查看记忆内容** - 通过 `memory` 指令查看 AI 在 `<memory>` 标签中记录的内容，了解 AI 对你的印象和记忆
+
+本质上，本插件就是提取模型输出中对应 XML 标签包裹的内容。你可以在配置中自定义要提取的标签名称，插件会自动注册对应的指令。
 
 ## 前置依赖
 
