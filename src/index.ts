@@ -15,14 +15,29 @@ export const usage = `
 - 只保留最新一条回复的提取内容
 `
 
+export interface TagConfig {
+    tag: string
+    format: string
+}
+
 export interface Config {
-    tags: string[]
+    characterName: string
+    tags: TagConfig[]
 }
 
 export const Config: Schema<Config> = Schema.object({
-    tags: Schema.array(String)
-        .default(['think'])
-        .description('要提取的 XML 标签列表（不包含尖括号）'),
+    characterName: Schema.string()
+        .default('AI')
+        .description('角色名称，用于格式化输出'),
+    tags: Schema.array(Schema.object({
+        tag: Schema.string()
+            .required()
+            .description('要提取的 XML 标签名（不包含尖括号）'),
+        format: Schema.string()
+            .default('{name}在想：\n{content}')
+            .description('输出格式模板。{name} 为角色名，{content} 为提取的内容'),
+    })).default([{ tag: 'think', format: '{name}在想：\n{content}' }])
+        .description('标签配置列表'),
 })
 
 // 扩展 Context 类型
@@ -65,12 +80,12 @@ export function apply(ctx: Context, config: Config) {
         const guildContents = new Map<string, string | null>()
         extractedContents.set(guildId, guildContents)
 
-        for (const tag of config.tags) {
-            const tagContent = extractTagContent(response, tag)
+        for (const tagConfig of config.tags) {
+            const tagContent = extractTagContent(response, tagConfig.tag)
 
             if (tagContent) {
-                logger.info(`[${guildId}] 提取到 <${tag}> 标签内容: ${tagContent.substring(0, 100)}...`)
-                guildContents.set(tag, tagContent)
+                logger.info(`[${guildId}] 提取到 <${tagConfig.tag}> 标签内容: ${tagContent.substring(0, 100)}...`)
+                guildContents.set(tagConfig.tag, tagContent)
             }
         }
     }
@@ -117,9 +132,16 @@ export function apply(ctx: Context, config: Config) {
         logger.warn('无法拦截 chatluna_character.logger，logger 不存在或 debug 方法不可用')
     }
 
+    // 格式化输出内容
+    function formatOutput(content: string, format: string): string {
+        return format
+            .replace('{name}', config.characterName)
+            .replace('{content}', content)
+    }
+
     // 为每个标签注册指令
-    for (const tag of config.tags) {
-        ctx.command(tag, `查看最新回复中 <${tag}> 标签的内容`)
+    for (const tagConfig of config.tags) {
+        ctx.command(tagConfig.tag, `查看最新回复中 <${tagConfig.tag}> 标签的内容`)
             .action(({ session }) => {
                 if (!session) return '无法获取会话信息'
 
@@ -127,16 +149,16 @@ export function apply(ctx: Context, config: Config) {
                 const guildContents = extractedContents.get(guildId)
 
                 if (!guildContents) {
-                    return `没有 <${tag}> 标签包裹的信息`
+                    return `没有 <${tagConfig.tag}> 标签包裹的信息`
                 }
 
-                const content = guildContents.get(tag)
+                const content = guildContents.get(tagConfig.tag)
 
                 if (!content) {
-                    return `没有 <${tag}> 标签包裹的信息`
+                    return `没有 <${tagConfig.tag}> 标签包裹的信息`
                 }
 
-                return content
+                return formatOutput(content, tagConfig.format)
             })
     }
 
@@ -147,6 +169,6 @@ export function apply(ctx: Context, config: Config) {
                 return '当前没有配置任何标签。'
             }
 
-            return `当前配置的标签:\n${config.tags.map((t) => `- <${t}>`).join('\n')}`
+            return `当前配置的标签：\n${config.tags.map((t) => `- <${t.tag}> → ${t.format}`).join('\n')}`
         })
 }

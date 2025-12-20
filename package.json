@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-chatluna-extractor",
   "description": "提取 chatluna-character 输出中特定 XML 标签的内容",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
