@@ -1,6 +1,12 @@
 {
-  "extends": "../../tsconfig.base",
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "sourceMap": true,
     "outDir": "lib",
     "rootDir": "src"
   },
