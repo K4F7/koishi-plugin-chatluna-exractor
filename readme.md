@@ -30,6 +30,9 @@
 `<relationship>` 等自定义 XML 时，请开启 `useLegacyXmlExtraction`，并在 `tags`
 中填写对应标签名。
 
+XML 提取通过 `chatluna_character/after-chat` 事件读取回复内容，不再依赖调试日志，
+因此无需开启 `chatluna-character` 的调试日志级别，多个群同时回复时也不会串内容。
+
 为避免与字段名称冲突，与标签同名的旧自定义指令会被自动跳过。例如旧配置中的
 `think` 指令会改用 `ex think`。
 

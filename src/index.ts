@@ -66,15 +66,46 @@ interface ReplyToolField {
 interface CharacterService {
     collect: (callback: (session: Session, messages: unknown[]) => Promise<void>) => void
     registerReplyToolField?: (field: ReplyToolField) => (() => void)
-    logger?: {
-        debug: (...args: unknown[]) => void
-    }
+}
+
+interface CharacterAfterChatPayload {
+    session: Session
+    status?: string | null
+    lastResponseMessage?: Record<string, unknown>
 }
 
 declare module 'koishi' {
     interface Context {
         chatluna_character: CharacterService
     }
+}
+
+/**
+ * chatluna-character 通过 JSON 快照传递回复消息，正文位于 LangChain 序列化后的
+ * `kwargs.content`；同时兼容普通对象与分段内容数组。
+ */
+function readMessageContent(message: unknown): string {
+    if (!message || typeof message !== 'object') return ''
+
+    const record = message as Record<string, unknown>
+    const kwargs = record.kwargs as Record<string, unknown> | undefined
+    const content = record.content ?? kwargs?.content
+
+    if (typeof content === 'string') return content
+    if (!Array.isArray(content)) return ''
+
+    return content
+        .map((part) => typeof part === 'string'
+            ? part
+            : typeof (part as Record<string, unknown>)?.text === 'string'
+                ? (part as Record<string, unknown>).text as string
+                : '')
+        .filter(Boolean)
+        .join('\n')
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 export function apply(ctx: Context, config: Config) {
@@ -125,44 +156,49 @@ export function apply(ctx: Context, config: Config) {
         : defaultXmlTags
     if (xmlTags.length) enableXmlExtraction(xmlTags)
 
-    function enableXmlExtraction(tags: string[]) {
-        let currentSessionKey: string | null = null
+    function extractXmlTags(sessionKey: string, response: string, tags: string[]) {
+        for (const tag of tags) {
+            const escapedTag = escapeRegExp(tag)
+            const regex = new RegExp(`<${escapedTag}>([\\s\\S]*?)<\\/${escapedTag}>`, 'gi')
+            const matches = Array.from(response.matchAll(regex), (match) => match[1].trim()).filter(Boolean)
+            if (matches.length) storeContent(sessionKey, tag, matches.join('\n\n'))
+        }
+    }
 
+    /**
+     * 使用 `after-chat` 事件而非拦截调试日志：该事件直接携带对应的 session，
+     * 因此多个会话并发回复时不会互相串内容。
+     */
+    function enableXmlExtraction(tags: string[]) {
         characterService.collect(async (session) => {
-            currentSessionKey = getSessionKey(session)
-            extractedContents.set(currentSessionKey, new Map())
+            extractedContents.set(getSessionKey(session), new Map())
         })
 
-        const characterLogger = characterService.logger
-        if (!characterLogger || typeof characterLogger.debug !== 'function') {
-            return
-        }
+        // 事件名不在 koishi 的 Events 类型中声明，避免与 chatluna-character
+        // 自身的声明冲突导致使用者项目类型检查报错。
+        const onAfterChat = (payload: CharacterAfterChatPayload) => {
+            const session = payload?.session
+            if (!session) return
 
-        const originalDebug = characterLogger.debug.bind(characterLogger)
-        characterLogger.debug = (...args: unknown[]) => {
-            originalDebug(...args)
-            const message = args[0]
-            if (typeof message !== 'string' || !/^model response:\s*/.test(message) || !currentSessionKey) return
+            const sessionKey = getSessionKey(session)
+            const response = readMessageContent(payload.lastResponseMessage)
+            if (response) extractXmlTags(sessionKey, response, tags)
 
-            const response = message.replace(/^model response:\s*/, '')
-
-            for (const tag of tags) {
-                const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                const regex = new RegExp(`<${escapedTag}>([\\s\\S]*?)<\\/${escapedTag}>`, 'gi')
-                const matches = Array.from(response.matchAll(regex), (match) => match[1].trim()).filter(Boolean)
-                if (matches.length) storeContent(currentSessionKey, tag, matches.join('\n\n'))
+            // status 由 chatluna-character 单独持久化，回复正文中不一定包含 <status>。
+            if (tags.includes('status') && typeof payload.status === 'string') {
+                storeContent(sessionKey, 'status', payload.status)
             }
         }
 
-        ctx.on('dispose', () => {
-            characterLogger.debug = originalDebug
-        })
+        ;(ctx as Context & {
+            on(name: string, listener: (payload: CharacterAfterChatPayload) => void): () => boolean
+        }).on('chatluna_character/after-chat', onAfterChat)
     }
 
     function formatOutput(format: string, contents: Map<string, string>): string {
         let result = format.replace(/\{name\}/g, config.characterName)
         for (const tag of config.tags) {
-            const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const escapedTag = escapeRegExp(tag)
             result = result.replace(new RegExp(`\\{${escapedTag}\\}`, 'g'), contents.get(tag) || `（无${tag}内容）`)
         }
         return result
@@ -201,12 +237,31 @@ export function apply(ctx: Context, config: Config) {
             return await deliver(session, content, config.directMessageExtraction || !!options?.private)
         })
 
+    // 无效或重复的指令名会让 ctx.command 抛错并导致整个插件启动失败，这里提前跳过。
+    const reservedNames = new Set(['ex', 'extractor', 'extractor.tags', 'extractor.commands'])
+    const registeredNames = new Set<string>()
+
     for (const commandConfig of config.commands) {
-        if (config.tags.includes(commandConfig.name)) {
+        const commandName = commandConfig.name?.trim()
+
+        if (!commandName) {
+            logger.warn('跳过一个名称为空的自定义指令。')
             continue
         }
+        if (config.tags.includes(commandName)) {
+            continue
+        }
+        if (reservedNames.has(commandName)) {
+            logger.warn(`跳过自定义指令 ${commandName}：该名称已被插件占用。`)
+            continue
+        }
+        if (registeredNames.has(commandName)) {
+            logger.warn(`跳过重复的自定义指令 ${commandName}。`)
+            continue
+        }
+        registeredNames.add(commandName)
 
-        ctx.command(commandConfig.name)
+        ctx.command(commandName)
             .option('private', '-s 发送到指令发起者的私信')
             .action(async ({ session, options }) => {
                 if (!session) return '无法获取会话信息'
